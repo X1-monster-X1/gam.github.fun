@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echo Shift+ Dino & Bats</title>
+
+<style>
+body {
+    margin: 0;
+    background: #ffffff; /* خلفية بيضاء */
+    overflow: hidden;
+    font-family: Arial;
+    color: #000;
+}
+
+canvas { 
+    display: block; 
+    z-index: 1;
+}
+
+/* شريط التحكم أسفل اليمين */
+#ui {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 30;
+    display: flex;
+    gap: 10px;
+}
+
+#ui button {
+    padding: 8px 16px;
+    font-size: 14px;
+    border: 2px solid #000;
+    background: #ffffff;
+    color: #000;
+    cursor: pointer;
+    box-shadow: 0 0 6px #000;
+}
+
+/* السكور أعلى اليسار */
+#score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    text-align: left;
+    font-size: 18px;
+    z-index: 20;
+    color: #000;
+}
+
+/* Level Up / التحديات */
+#levelUp {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    text-align: center;
+    font-size: 28px;
+    color: #e91e63;
+    opacity: 0;
+    transition: opacity 1s;
+    z-index: 20;
+}
+
+/* شاشة Game Over */
+#gameOver {
+    position: absolute;
+    inset: 0;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background: rgba(0,0,0,0.75);
+    z-index: 25;
+    color: #fff;
+}
+
+#gameOver button {
+    padding: 10px 20px;
+    font-size: 16px;
+    border: 2px solid #ff9800;
+    background: transparent;
+    color: #ff9800;
+    cursor: pointer;
+    box-shadow: 0 0 8px #ff9800;
+}
+
+/* ديناصور صغير */
+#player {
+    position: absolute;
+    width: 22px;
+    height: 16px;
+    background: #4caf50;
+    border-radius: 6px 6px 4px 4px;
+    z-index: 5;
+}
+#player::before {
+    content: "";
+    position: absolute;
+    right: -8px;
+    top: 4px;
+    width: 12px;
+    height: 8px;
+    background: #4caf50;
+    border-radius: 0 50% 50% 0;
+}
+#player::after {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: -3px;
+    width: 12px;
+    height: 12px;
+    background: #4caf50;
+    border-radius: 50%;
+}
+
+/* QR Code أسفل اليسار */
+#qr {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 30;
+    text-align: center;
+    font-size: 12px;
+    color: #000;
+}
+#qr img {
+    width: 90px;
+    height: 90px;
+    border: 2px solid #000;
+}
+
+/* نص أفضل السكورات */
+#topScores {
+    white-space: pre;
+    text-align: left;
+    font-family: monospace;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+    <button id="startBtn">Start</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="settingsBtn">Settings</button>
+</div>
+
+<div id="score">Score: 0 | Level: 1</div>
+<div id="levelUp">LEVEL UP!</div>
+
+<div id="player"></div>
+
+<div id="gameOver">
+    <h1>Game Over</h1>
+    <p id="final"></p>
+    <p id="highScoreText"></p>
+    <p id="topScores"></p>
+    <button id="restartBtn">Restart</button>
+</div>
+
+<div id="qr">
+    <!-- غيّر الرابط بعد ما ترفع اللعبة على GitHub -->
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://example.com/echo-shift-dino" alt="Game QR">
+    <div>امسح الكود للعب على الجوال</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+// الكانفس
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+let w, h;
+function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// حالة اللعبة
+let running = false;
+let paused = false;
+let score = 0;
+let level = 1;
+let multiplier = 1;
+let highScore = Number(localStorage.getItem("echo_highscore") || 0);
+let highScores = JSON.parse(localStorage.getItem("echo_highscores") || "[]");
+
+// اللاعب
+const playerEl = document.getElementById("player");
+let player = { x: w/2, y: h/2, speed: 4 };
+
+// إدخال
+let keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+canvas.addEventListener("touchmove", e=>{
+    let t = e.touches[0];
+    player.x = t.clientX;
+    player.y = t.clientY;
+});
+canvas.addEventListener("mousemove", e => {
+    player.x = e.clientX;
+    player.y = e.clientY;
+});
+
+// خفافيش (أعداء) + عوائق المرحلة الصعبة
+let enemies = [];
+let obstacles = [];
+
+// أزرار
+const startBtn = document.getElementById("startBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const restartBtn = document.getElementById("restartBtn");
+
+// بدء
+function startGame(){
+    score = 0;
+    level = 1;
+    multiplier = 1;
+    clearEnemies();
+    obstacles = [];
+    running = true;
+    paused = false;
+    document.getElementById("gameOver").style.display = "none";
+    pauseBtn.textContent = "Pause";
+    loop();
+}
+
+// إيقاف/استئناف
+function togglePause(){
+    if(!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    if(!paused) loop();
+}
+
+// إعدادات
+function openSettings(){
+    alert("Settings:\n- الحركة: WASD + ماوس + لمس\n- الخفافيش تزداد سرعة وعددًا مع كل Level\n- بعد Level 5 تظهر عوائق ثابتة.");
+}
+
+startBtn.onclick = startGame;
+pauseBtn.onclick = togglePause;
+settingsBtn.onclick = openSettings;
+restartBtn.onclick = startGame;
+
+// حلقة
+function loop(){
+    if(!running || paused) return;
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// تحديث
+function update(){
+    if(keys["w"]) player.y -= player.speed;
+    if(keys["s"]) player.y += player.speed;
+    if(keys["a"]) player.x -= player.speed;
+    if(keys["d"]) player.x += player.speed;
+
+    player.x = Math.max(15, Math.min(w - 15, player.x));
+    player.y = Math.max(12, Math.min(h - 12, player.y));
+
+    // توليد خفافيش (أعداء) – أكثر متعة وتحدي
+    let spawnRate = 0.012 + level * 0.004;
+    if(Math.random() < spawnRate){
+        enemies.push({
+            x: Math.random()*w,
+            y: -20,
+            speedY: 2 + level * 0.4,
+            speedX: (Math.random() - 0.5) * (1 + level * 0.2)
+        });
+    }
+
+    // مرحلة صعبة بعد Level 5: عوائق ثابتة
+    if(level === 6 && obstacles.length === 0){
+        createObstacles();
+        showChallenge("HARD STAGE: Avoid the walls!");
+    }
+
+    enemies = enemies.filter(e => {
+        e.y += e.speedY;
+        e.x += e.speedX;
+        if(e.y > h + 60 || e.x < -40 || e.x > w + 40) return false;
+
+        // تصادم مع اللاعب
+        if(Math.abs(e.x - player.x) < 20 && Math.abs(e.y - player.y) < 18){
+            gameOver();
+        }
+        return true;
+    });
+
+    // تصادم مع العوائق
+    for(let o of obstacles){
+        if(player.x > o.x && player.x < o.x + o.w &&
+           player.y > o.y && player.y < o.y + o.h){
+            gameOver();
+            break;
+        }
+    }
+
+    score += multiplier;
+
+    if(score > level * 1000){
+        level++;
+        multiplier++;
+        showChallenge("LEVEL " + level + " UP!");
+    }
+
+    document.getElementById("score").innerText =
+        "Score: " + score + " | Level: " + level;
+}
+
+// رسم
+function draw(){
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,w,h);
+
+    // عوائق المرحلة الصعبة
+    ctx.fillStyle = "#9e9e9e";
+    obstacles.forEach(o=>{
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+    });
+
+    // تحريك الديناصور (CSS)
+    playerEl.style.transform = `translate(${player.x - 11}px, ${player.y - 8}px)`;
+
+    // رسم الخفافيش (على الكانفس) – سوداء مع "تحديقات" (عيون)
+    enemies.forEach(e=>{
+        // جسم الخفاش
+        ctx.fillStyle = "#000000";
+        ctx.beginPath();
+        ctx.ellipse(e.x, e.y, 10, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // جناح يسار
+        ctx.beginPath();
+        ctx.moveTo(e.x - 10, e.y);
+        ctx.lineTo(e.x - 20, e.y - 6);
+        ctx.lineTo(e.x - 10, e.y - 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // جناح يمين
+        ctx.beginPath();
+        ctx.moveTo(e.x + 10, e.y);
+        ctx.lineTo(e.x + 20, e.y - 6);
+        ctx.lineTo(e.x + 10, e.y - 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // عيون (تحديقات)
+        ctx.fillStyle = "#ffeb3b";
+        ctx.beginPath();
+        ctx.arc(e.x - 3, e.y - 1, 1.5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(e.x + 3, e.y - 1, 1.5, 0, Math.PI*2);
+        ctx.fill();
+    });
+}
+
+// إنشاء عوائق المرحلة الصعبة
+function createObstacles(){
+    obstacles = [
+        { x: w*0.25, y: h*0.2,  w: 40,  h: h*0.6 },
+        { x: w*0.55, y: 0,      w: 40,  h: h*0.5 },
+        { x: w*0.75, y: h*0.4,  w: 40,  h: h*0.6 }
+    ];
+}
+
+// نص التحديات / LevelUp
+function showChallenge(text){
+    const el = document.getElementById("levelUp");
+    el.textContent = text;
+    el.style.opacity = 1;
+    setTimeout(()=> el.style.opacity = 0, 1000);
+}
+
+// تنظيف الخفافيش (عند إعادة التشغيل)
+function clearEnemies(){
+    enemies = [];
+}
+
+// Game Over + أفضل 5 سكورات
+function gameOver(){
+    if(!running) return;
+    running = false;
+
+    if(score > highScore){
+        highScore = score;
+        localStorage.setItem("echo_highscore", highScore);
+    }
+
+    highScores.push(score);
+    highScores.sort((a,b)=> b - a);
+    highScores = highScores.slice(0,5);
+    localStorage.setItem("echo_highscores", JSON.stringify(highScores));
+
+    let list = highScores.map((s,i)=> `${i+1}) ${s}`).join("\n");
+
+    document.getElementById("gameOver").style.display = "flex";
+    document.getElementById("final").innerText = "Your Score: " + score;
+    document.getElementById("highScoreText").innerText = "Your Best: " + highScore;
+    document.getElementById("topScores").innerText = "Top 5 Scores:\n" + list;
+
+    pauseBtn.textContent = "Pause";
+}
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+<!--
+-----------
+┌──────────────────────────────┐
+│          Start Screen         │
+└───────────────┬──────────────┘
+                │ startGame()
+                ▼
+┌──────────────────────────────┐
+│        Game Loop (loop)       │
+│  ┌──────────────┬──────────┐ │
+│  │ update()      │ draw()   │ │
+│  └──────────────┴──────────┘ │
+└───────────────┬──────────────┘
+                │ تصادم؟
+                ▼
+┌──────────────────────────────┐
+│          Game Over            │
+└──────────────────────────────┘
+-->
