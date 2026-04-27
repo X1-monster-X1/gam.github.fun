@@ -1,424 +1,376 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html> <!-- تعريف نوع المستند HTML5 -->
+<html lang="ar" dir="rtl"> <!-- لغة الصفحة عربية واتجاه من اليمين لليسار -->
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Echo Shift+ Dino & Bats</title>
+<meta charset="utf-8"> <!-- ترميز يدعم العربية -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- استجابة للشاشات -->
+<title>لعبة الديناصور والخفافيش</title> <!-- عنوان الصفحة -->
 
 <style>
-body {
-    margin: 0;
-    background: #ffffff; /* خلفية بيضاء */
-    overflow: hidden;
-    font-family: Arial;
-    color: #000;
+/* ----------------- CSS عام ----------------- */
+body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #ffffff; } /* إعدادات الجسم */
+canvas { display: block; } /* الكانفس ككتلة */
+
+/* شاشة البداية */
+#startScreen {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.96);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 100;
 }
 
-canvas { 
-    display: block; 
-    z-index: 1;
+/* صندوق QR */
+#qrBox { border: 3px solid #000; padding: 10px; background: #fff; margin-bottom: 18px; text-align: center; }
+#qrBox img { width: 160px; height: 160px; display: block; }
+
+/* أزرار عامة */
+.btn { padding: 12px 22px; font-size: 18px; margin: 8px; cursor: pointer; border: 2px solid #000; background: #fff; border-radius: 6px; }
+.btn:hover { background: #000; color: #fff; }
+
+/* نافذة الإعدادات (منبثقة) */
+#settingsMenu {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: #fff; padding: 16px; border: 3px solid #000; display: none; z-index: 200; border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
 }
 
-/* شريط التحكم أسفل اليمين */
-#ui {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    z-index: 30;
-    display: flex;
-    gap: 10px;
-}
+/* HUD (عرض النقاط) */
+#hud { position: absolute; top: 12px; left: 12px; font-size: 20px; font-weight: bold; z-index: 50;
+       background: rgba(255,255,255,0.85); padding: 6px 10px; border-radius: 6px; border: 2px solid #000; }
 
-#ui button {
-    padding: 8px 16px;
-    font-size: 14px;
-    border: 2px solid #000;
-    background: #ffffff;
-    color: #000;
-    cursor: pointer;
-    box-shadow: 0 0 6px #000;
-}
-
-/* السكور أعلى اليسار */
-#score {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    text-align: left;
-    font-size: 18px;
-    z-index: 20;
-    color: #000;
-}
-
-/* Level Up / التحديات */
-#levelUp {
-    position: absolute;
-    top: 50%;
-    width: 100%;
-    text-align: center;
-    font-size: 28px;
-    color: #e91e63;
-    opacity: 0;
-    transition: opacity 1s;
-    z-index: 20;
-}
-
-/* شاشة Game Over */
-#gameOver {
-    position: absolute;
-    inset: 0;
-    display: none;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    background: rgba(0,0,0,0.75);
-    z-index: 25;
-    color: #fff;
-}
-
-#gameOver button {
-    padding: 10px 20px;
-    font-size: 16px;
-    border: 2px solid #ff9800;
-    background: transparent;
-    color: #ff9800;
-    cursor: pointer;
-    box-shadow: 0 0 8px #ff9800;
-}
-
-/* ديناصور صغير */
+/* عنصر اللاعب: الآن صورة ديناصور */
 #player {
-    position: absolute;
-    width: 22px;
-    height: 16px;
-    background: #4caf50;
-    border-radius: 6px 6px 4px 4px;
-    z-index: 5;
-}
-#player::before {
-    content: "";
-    position: absolute;
-    right: -8px;
-    top: 4px;
-    width: 12px;
-    height: 8px;
-    background: #4caf50;
-    border-radius: 0 50% 50% 0;
-}
-#player::after {
-    content: "";
-    position: absolute;
-    left: -8px;
-    top: -3px;
-    width: 12px;
-    height: 12px;
-    background: #4caf50;
-    border-radius: 50%;
+  position: absolute;
+  width: 72px; height: 72px; /* حجم اللاعب */
+  pointer-events: none; z-index: 10;
+  transform: translate(-50%, -50%); /* مركزية الصورة حول المؤشر */
 }
 
-/* QR Code أسفل اليسار */
-#qr {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    z-index: 30;
-    text-align: center;
-    font-size: 12px;
-    color: #000;
+/* زر الإيقاف/الاستئناف أثناء اللعب */
+#pauseBtn {
+  position: absolute; top: 12px; right: 12px; z-index: 60;
+  padding: 10px 14px; font-size: 16px; border-radius: 8px; border: 2px solid #000; background: #fff; cursor: pointer;
 }
-#qr img {
-    width: 90px;
-    height: 90px;
-    border: 2px solid #000;
-}
+#pauseBtn:hover { background: #000; color: #fff; }
 
-/* نص أفضل السكورات */
-#topScores {
-    white-space: pre;
-    text-align: left;
-    font-family: monospace;
+/* شاشة الخسارة */
+#gameOver {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column;
+  align-items: center; justify-content: center; color: #fff; z-index: 300; text-align: center; padding: 20px;
 }
+#scoreList { margin-top: 14px; font-size: 18px; line-height: 30px; }
+
+/* تحسينات صغيرة للمدخلات */
+input[type="color"], select { margin: 6px 0; padding: 6px; }
+.muted { font-size: 13px; color: #333; opacity: 0.85; }
 </style>
 </head>
 
 <body>
 
-<div id="ui">
-    <button id="startBtn">Start</button>
-    <button id="pauseBtn">Pause</button>
-    <button id="settingsBtn">Settings</button>
+<!-- شاشة البداية: QR + أعلى سكور + أزرار -->
+<div id="startScreen">
+  <h1>لعبة الديناصور والخفافيش</h1> <!-- عنوان -->
+  <div id="qrBox">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://x1-monster-x1.github.io/gam.github.fun/" alt="QR">
+    <p class="muted">امسح الكود للعب على الجوال</p>
+  </div>
+
+  <h3>أعلى سكور: <span id="bestScoreHome">0</span></h3> <!-- أعلى سكور محفوظ -->
+
+  <div>
+    <button class="btn" onclick="startGame()">ابدأ اللعب</button> <!-- بدء اللعبة -->
+    <button class="btn" onclick="toggleSettings(true)">الإعدادات ⚙️</button> <!-- فتح الإعدادات -->
+  </div>
 </div>
 
-<div id="score">Score: 0 | Level: 1</div>
-<div id="levelUp">LEVEL UP!</div>
+<!-- نافذة الإعدادات (تظهر فوق الشاشة الرئيسية) -->
+<div id="settingsMenu">
+  <h2>إعدادات اللعبة</h2>
+  <label>لون الخلفية:</label>
+  <input type="color" id="bgColorInput" value="#ffffff"><br>
+  <label>لون الخفافيش:</label>
+  <input type="color" id="batColorInput" value="#000000"><br>
+  <label>صعوبة البداية:</label>
+  <select id="difficultySelect">
+    <option value="easy">سهل</option>
+    <option value="normal" selected>عادي</option>
+    <option value="hard">صعب</option>
+  </select>
+  <div style="margin-top:12px;">
+    <button class="btn" onclick="saveSettings()">حفظ</button>
+    <button class="btn" onclick="toggleSettings(false)">إغلاق</button>
+  </div>
+</div>
 
-<div id="player"></div>
+<!-- HUD النقاط -->
+<div id="hud">النقاط: <span id="scoreVal">0</span></div>
 
+<!-- زر الإيقاف/الاستئناف أثناء اللعب -->
+<button id="pauseBtn" style="display:none" onclick="togglePause()">إيقاف</button>
+
+<!-- عنصر اللاعب: صورة ديناصور (تم استبدال القطة بالديناصور) -->
+<img id="player" src="https://png.pngtree.com/png-vector/20230118/ourmid/pngtree-cartoon-dinosaur-png-image_4669876.png" alt="player">
+
+<!-- شاشة الخسارة -->
 <div id="gameOver">
-    <h1>Game Over</h1>
-    <p id="final"></p>
-    <p id="highScoreText"></p>
-    <p id="topScores"></p>
-    <button id="restartBtn">Restart</button>
+  <h1>خسرت!</h1>
+  <p id="yourScore"></p>
+  <h2>أفضل 6 نتائج</h2>
+  <div id="scoreList"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" onclick="restartToHome()">العودة للصفحة الرئيسية</button>
+    <button class="btn" onclick="restartGame()">إعادة اللعب</button>
+  </div>
 </div>
 
-<div id="qr">
-    <!-- غيّر الرابط بعد ما ترفع اللعبة على GitHub -->
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://example.com/echo-shift-dino" alt="Game QR">
-    <div>امسح الكود للعب على الجوال</div>
-</div>
-
+<!-- كانفس الرسم -->
 <canvas id="c"></canvas>
 
 <script>
-// الكانفس
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
-let w, h;
-function resize(){
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
+/* ------------------ جافاسكربت اللعبة (مفسر ومشروح) ------------------ */
+
+/* عناصر DOM الأساسية */
+const canvas = document.getElementById('c'); // عنصر الكانفس
+const ctx = canvas.getContext('2d'); // سياق الرسم ثنائي الأبعاد
+const playerEl = document.getElementById('player'); // عنصر صورة اللاعب (الديناصور)
+const startScreen = document.getElementById('startScreen'); // شاشة البداية
+const settingsMenu = document.getElementById('settingsMenu'); // نافذة الإعدادات
+const gameOverEl = document.getElementById('gameOver'); // شاشة الخسارة
+const scoreValEl = document.getElementById('scoreVal'); // عنصر عرض النقاط
+const bestScoreHomeEl = document.getElementById('bestScoreHome'); // أعلى سكور في الهوم
+const pauseBtn = document.getElementById('pauseBtn'); // زر الإيقاف/الاستئناف
+
+/* متغيرات اللعبة */
+let w = 0, h = 0; // أبعاد الكانفس
+let score = 0; // النقاط الحالية
+let running = false; // هل اللعبة تعمل؟
+let paused = false; // هل اللعبة موقوفة مؤقتاً؟
+let enemies = []; // مصفوفة الخفافيش
+let mouse = { x: window.innerWidth/2, y: window.innerHeight/2 }; // موقع المؤشر
+let batColor = '#000000'; // لون الخفافيش
+let bgColor = '#ffffff'; // لون الخلفية
+let spawnRate = 0.03; // معدل التوليد الابتدائي
+let enemySpeedBase = 3; // سرعة أساسية للخفافيش
+let difficulty = 'normal'; // مستوى الصعوبة
+let startTime = 0; // وقت بداية اللعبة
+
+/* ضبط حجم الكانفس ليتناسب مع النافذة */
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
 }
-window.addEventListener("resize", resize);
+resize();
+window.addEventListener('resize', resize); // تحديث عند تغيير حجم النافذة
+
+/* تتبع حركة الماوس واللمس */
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('touchmove', e => { if (e.touches && e.touches[0]) { mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; } }, { passive: true });
+
+/* تحميل الإعدادات من localStorage وتطبيقها */
+function loadSettings() {
+  bgColor = localStorage.getItem('bgColor') || '#ffffff';
+  batColor = localStorage.getItem('batColor') || '#000000';
+  difficulty = localStorage.getItem('difficulty') || 'normal';
+
+  document.body.style.background = bgColor;
+  document.getElementById('bgColorInput').value = bgColor;
+  document.getElementById('batColorInput').value = batColor;
+  document.getElementById('difficultySelect').value = difficulty;
+
+  if (difficulty === 'easy') { spawnRate = 0.02; enemySpeedBase = 2; }
+  else if (difficulty === 'normal') { spawnRate = 0.03; enemySpeedBase = 3; }
+  else if (difficulty === 'hard') { spawnRate = 0.05; enemySpeedBase = 4; }
+}
+loadSettings(); // استدعاء أولي لتحميل الإعدادات
+
+/* تحديث أعلى سكور في الصفحة الرئيسية */
+function updateBestHome() {
+  let best = JSON.parse(localStorage.getItem('topScores') || '[]');
+  bestScoreHomeEl.innerText = best[0] || 0;
+}
+updateBestHome();
+
+/* إظهار/إخفاء نافذة الإعدادات */
+function toggleSettings(show) {
+  settingsMenu.style.display = show ? 'block' : 'none';
+}
+
+/* حفظ الإعدادات من الواجهة */
+function saveSettings() {
+  const bg = document.getElementById('bgColorInput').value;
+  const bat = document.getElementById('batColorInput').value;
+  const diff = document.getElementById('difficultySelect').value;
+
+  localStorage.setItem('bgColor', bg);
+  localStorage.setItem('batColor', bat);
+  localStorage.setItem('difficulty', diff);
+
+  bgColor = bg; batColor = bat; difficulty = diff;
+  document.body.style.background = bgColor;
+
+  if (difficulty === 'easy') { spawnRate = 0.02; enemySpeedBase = 2; }
+  else if (difficulty === 'normal') { spawnRate = 0.03; enemySpeedBase = 3; }
+  else if (difficulty === 'hard') { spawnRate = 0.05; enemySpeedBase = 4; }
+
+  toggleSettings(false);
+}
+
+/* بدء اللعبة من شاشة البداية */
+function startGame() {
+  startScreen.style.display = 'none'; // إخفاء الشاشة الرئيسية
+  score = 0; enemies = []; running = true; paused = false;
+  pauseBtn.style.display = 'block'; pauseBtn.innerText = 'إيقاف'; // إظهار زر الإيقاف
+  startTime = performance.now();
+  loop(); // بدء الحلقة
+}
+
+/* إعادة للصفحة الرئيسية */
+function restartToHome() {
+  gameOverEl.style.display = 'none';
+  startScreen.style.display = 'flex';
+  pauseBtn.style.display = 'none';
+  updateBestHome();
+}
+
+/* إعادة تشغيل اللعبة مباشرة */
+function restartGame() {
+  gameOverEl.style.display = 'none';
+  score = 0; enemies = []; running = true; paused = false;
+  pauseBtn.style.display = 'block'; pauseBtn.innerText = 'إيقاف';
+  startTime = performance.now();
+  loop();
+}
+
+/* تبديل الإيقاف/الاستئناف */
+function togglePause() {
+  if (!running) return;
+  paused = !paused;
+  pauseBtn.innerText = paused ? 'استئناف' : 'إيقاف';
+  if (!paused) loop(); // إذا استأنفنا، نعيد تشغيل الحلقة
+}
+
+/* الحلقة الأساسية */
+function loop() {
+  if (!running || paused) return;
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* تحديث حالة اللعبة */
+function update() {
+  // زيادة النقاط
+  score += 1;
+  scoreValEl.innerText = score;
+
+  // تحريك عنصر اللاعب لموقع المؤشر (مركز الصورة على المؤشر)
+  playerEl.style.left = mouse.x + 'px';
+  playerEl.style.top = mouse.y + 'px';
+
+  // توليد خفافيش عشوائية
+  if (Math.random() < spawnRate) {
+    const speed = enemySpeedBase + Math.random() * 2 + (score / 1500); // زيادة طفيفة مع النقاط
+    enemies.push({ x: Math.random() * w, y: -40, s: speed, wobble: Math.random() * 2 });
+  }
+
+  // تحريك الخفافيش وفحص التصادم
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    e.y += e.s;
+    e.x += Math.sin((e.y + i * 10) / 30) * e.wobble;
+
+    const dx = mouse.x - e.x;
+    const dy = mouse.y - e.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < 40) { // إذا التصادم
+      endGame();
+      return;
+    }
+
+    if (e.y > h + 50) enemies.splice(i, 1); // إزالة الخفافيش خارج الشاشة
+  }
+
+  // زيادة صعوبة تدريجياً مع الوقت
+  const elapsed = (performance.now() - startTime) / 1000;
+  if (elapsed > 10 && elapsed < 60) spawnRate = Math.min(0.06, spawnRate + 0.0005);
+  else if (elapsed >= 60) spawnRate = Math.min(0.12, spawnRate + 0.001);
+}
+
+/* رسم الخفافيش */
+function draw() {
+  ctx.clearRect(0, 0, w, h); // مسح الكانفس
+
+  enemies.forEach(e => {
+    ctx.fillStyle = batColor;
+    ctx.beginPath();
+    ctx.ellipse(e.x, e.y, 16, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // جناح أيسر
+    ctx.beginPath();
+    ctx.moveTo(e.x - 16, e.y);
+    ctx.lineTo(e.x - 32, e.y - 12);
+    ctx.lineTo(e.x - 16, e.y - 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // جناح أيمن
+    ctx.beginPath();
+    ctx.moveTo(e.x + 16, e.y);
+    ctx.lineTo(e.x + 32, e.y - 12);
+    ctx.lineTo(e.x + 16, e.y - 6);
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
+/* نهاية اللعبة: حفظ أفضل 6 وعرض شاشة الخسارة */
+function endGame() {
+  running = false;
+  pauseBtn.style.display = 'none';
+  document.getElementById('yourScore').innerText = 'نتيجتك: ' + score;
+
+  let list = JSON.parse(localStorage.getItem('topScores') || '[]');
+  list.push(score);
+  list.sort((a,b) => b - a);
+  list = list.slice(0,6);
+  localStorage.setItem('topScores', JSON.stringify(list));
+
+  // عرض أفضل 6
+  let html = '';
+  list.forEach((s,i) => html += `${i+1} - ${s}<br>`);
+  document.getElementById('scoreList').innerHTML = html;
+
+  gameOverEl.style.display = 'flex';
+  updateBestHome();
+}
+
+/* منع السحب الافتراضي على اللمس داخل الكانفس لتحسين تجربة اللعب */
+document.addEventListener('touchstart', function(e){ if (e.target === canvas) e.preventDefault(); }, { passive: false });
+
+/* بدء اللعبة بالضغط على Enter من لوحة المفاتيح (إذا كانت شاشة البداية ظاهرة) */
+document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !running && startScreen.style.display !== 'none') startGame(); });
+
+/* تهيئة أولية: وضع اللاعب في منتصف الشاشة */
+playerEl.style.left = (window.innerWidth/2) + 'px';
+playerEl.style.top = (window.innerHeight/2) + 'px';
+
+/* تحديث أبعاد الكانفس عند التحميل (مكرر للتأكد) */
 resize();
 
-// حالة اللعبة
-let running = false;
-let paused = false;
-let score = 0;
-let level = 1;
-let multiplier = 1;
-let highScore = Number(localStorage.getItem("echo_highscore") || 0);
-let highScores = JSON.parse(localStorage.getItem("echo_highscores") || "[]");
+/* تطبيق لون الخفافيش الافتراضي من الإعدادات المحفوظة */
+batColor = localStorage.getItem('batColor') || batColor;
 
-// اللاعب
-const playerEl = document.getElementById("player");
-let player = { x: w/2, y: h/2, speed: 4 };
+/* عرض أعلى سكور في الصفحة الرئيسية عند التحميل */
+updateBestHome();
 
-// إدخال
-let keys = {};
-window.addEventListener("keydown", e => keys[e.key] = true);
-window.addEventListener("keyup", e => keys[e.key] = false);
-
-canvas.addEventListener("touchmove", e=>{
-    let t = e.touches[0];
-    player.x = t.clientX;
-    player.y = t.clientY;
-});
-canvas.addEventListener("mousemove", e => {
-    player.x = e.clientX;
-    player.y = e.clientY;
-});
-
-// خفافيش (أعداء) + عوائق المرحلة الصعبة
-let enemies = [];
-let obstacles = [];
-
-// أزرار
-const startBtn = document.getElementById("startBtn");
-const pauseBtn = document.getElementById("pauseBtn");
-const settingsBtn = document.getElementById("settingsBtn");
-const restartBtn = document.getElementById("restartBtn");
-
-// بدء
-function startGame(){
-    score = 0;
-    level = 1;
-    multiplier = 1;
-    clearEnemies();
-    obstacles = [];
-    running = true;
-    paused = false;
-    document.getElementById("gameOver").style.display = "none";
-    pauseBtn.textContent = "Pause";
-    loop();
-}
-
-// إيقاف/استئناف
-function togglePause(){
-    if(!running) return;
-    paused = !paused;
-    pauseBtn.textContent = paused ? "Resume" : "Pause";
-    if(!paused) loop();
-}
-
-// إعدادات
-function openSettings(){
-    alert("Settings:\n- الحركة: WASD + ماوس + لمس\n- الخفافيش تزداد سرعة وعددًا مع كل Level\n- بعد Level 5 تظهر عوائق ثابتة.");
-}
-
-startBtn.onclick = startGame;
-pauseBtn.onclick = togglePause;
-settingsBtn.onclick = openSettings;
-restartBtn.onclick = startGame;
-
-// حلقة
-function loop(){
-    if(!running || paused) return;
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
-
-// تحديث
-function update(){
-    if(keys["w"]) player.y -= player.speed;
-    if(keys["s"]) player.y += player.speed;
-    if(keys["a"]) player.x -= player.speed;
-    if(keys["d"]) player.x += player.speed;
-
-    player.x = Math.max(15, Math.min(w - 15, player.x));
-    player.y = Math.max(12, Math.min(h - 12, player.y));
-
-    // توليد خفافيش (أعداء) – أكثر متعة وتحدي
-    let spawnRate = 0.012 + level * 0.004;
-    if(Math.random() < spawnRate){
-        enemies.push({
-            x: Math.random()*w,
-            y: -20,
-            speedY: 2 + level * 0.4,
-            speedX: (Math.random() - 0.5) * (1 + level * 0.2)
-        });
-    }
-
-    // مرحلة صعبة بعد Level 5: عوائق ثابتة
-    if(level === 6 && obstacles.length === 0){
-        createObstacles();
-        showChallenge("HARD STAGE: Avoid the walls!");
-    }
-
-    enemies = enemies.filter(e => {
-        e.y += e.speedY;
-        e.x += e.speedX;
-        if(e.y > h + 60 || e.x < -40 || e.x > w + 40) return false;
-
-        // تصادم مع اللاعب
-        if(Math.abs(e.x - player.x) < 20 && Math.abs(e.y - player.y) < 18){
-            gameOver();
-        }
-        return true;
-    });
-
-    // تصادم مع العوائق
-    for(let o of obstacles){
-        if(player.x > o.x && player.x < o.x + o.w &&
-           player.y > o.y && player.y < o.y + o.h){
-            gameOver();
-            break;
-        }
-    }
-
-    score += multiplier;
-
-    if(score > level * 1000){
-        level++;
-        multiplier++;
-        showChallenge("LEVEL " + level + " UP!");
-    }
-
-    document.getElementById("score").innerText =
-        "Score: " + score + " | Level: " + level;
-}
-
-// رسم
-function draw(){
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0,0,w,h);
-
-    // عوائق المرحلة الصعبة
-    ctx.fillStyle = "#9e9e9e";
-    obstacles.forEach(o=>{
-        ctx.fillRect(o.x, o.y, o.w, o.h);
-    });
-
-    // تحريك الديناصور (CSS)
-    playerEl.style.transform = `translate(${player.x - 11}px, ${player.y - 8}px)`;
-
-    // رسم الخفافيش (على الكانفس) – سوداء مع "تحديقات" (عيون)
-    enemies.forEach(e=>{
-        // جسم الخفاش
-        ctx.fillStyle = "#000000";
-        ctx.beginPath();
-        ctx.ellipse(e.x, e.y, 10, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // جناح يسار
-        ctx.beginPath();
-        ctx.moveTo(e.x - 10, e.y);
-        ctx.lineTo(e.x - 20, e.y - 6);
-        ctx.lineTo(e.x - 10, e.y - 2);
-        ctx.closePath();
-        ctx.fill();
-
-        // جناح يمين
-        ctx.beginPath();
-        ctx.moveTo(e.x + 10, e.y);
-        ctx.lineTo(e.x + 20, e.y - 6);
-        ctx.lineTo(e.x + 10, e.y - 2);
-        ctx.closePath();
-        ctx.fill();
-
-        // عيون (تحديقات)
-        ctx.fillStyle = "#ffeb3b";
-        ctx.beginPath();
-        ctx.arc(e.x - 3, e.y - 1, 1.5, 0, Math.PI*2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(e.x + 3, e.y - 1, 1.5, 0, Math.PI*2);
-        ctx.fill();
-    });
-}
-
-// إنشاء عوائق المرحلة الصعبة
-function createObstacles(){
-    obstacles = [
-        { x: w*0.25, y: h*0.2,  w: 40,  h: h*0.6 },
-        { x: w*0.55, y: 0,      w: 40,  h: h*0.5 },
-        { x: w*0.75, y: h*0.4,  w: 40,  h: h*0.6 }
-    ];
-}
-
-// نص التحديات / LevelUp
-function showChallenge(text){
-    const el = document.getElementById("levelUp");
-    el.textContent = text;
-    el.style.opacity = 1;
-    setTimeout(()=> el.style.opacity = 0, 1000);
-}
-
-// تنظيف الخفافيش (عند إعادة التشغيل)
-function clearEnemies(){
-    enemies = [];
-}
-
-// Game Over + أفضل 5 سكورات
-function gameOver(){
-    if(!running) return;
-    running = false;
-
-    if(score > highScore){
-        highScore = score;
-        localStorage.setItem("echo_highscore", highScore);
-    }
-
-    highScores.push(score);
-    highScores.sort((a,b)=> b - a);
-    highScores = highScores.slice(0,5);
-    localStorage.setItem("echo_highscores", JSON.stringify(highScores));
-
-    let list = highScores.map((s,i)=> `${i+1}) ${s}`).join("\n");
-
-    document.getElementById("gameOver").style.display = "flex";
-    document.getElementById("final").innerText = "Your Score: " + score;
-    document.getElementById("highScoreText").innerText = "Your Best: " + highScore;
-    document.getElementById("topScores").innerText = "Top 5 Scores:\n" + list;
-
-    pauseBtn.textContent = "Pause";
-}
+/* ------------------ نهاية السكربت ------------------ */
 </script>
 
 </body>
 </html>
+
 
 
 
